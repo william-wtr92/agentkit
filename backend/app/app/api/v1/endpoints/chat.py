@@ -17,11 +17,12 @@ from app.services.chat_agent.meta_agent import get_conv_token_buffer_memory
 from app.utils.streaming.callbacks.stream import AsyncIteratorCallbackHandler
 from app.utils.streaming.helpers import event_generator, handle_exceptions
 from app.utils.streaming.StreamingJsonListResponse import StreamingJsonListResponse
+from app.utils.utils import trace
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-
+@trace
 def get_meta_agent_with_api_key(
     chat: IChatQuery,
 ) -> AgentExecutor:
@@ -45,6 +46,7 @@ async def run_status(
 
 
 @router.get("/run/{run_id}/cancel", response_model=bool)
+@trace
 async def run_cancel(
     run_id: str,
 ) -> bool:
@@ -53,6 +55,7 @@ async def run_cancel(
 
 
 @router.post("/agent", dependencies=[Depends(agent_deps.set_global_tool_context)])
+@trace
 async def agent_chat(
     chat: IChatQuery,
     jwt: Annotated[dict, Depends(get_jwt)],
