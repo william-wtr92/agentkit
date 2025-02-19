@@ -3,11 +3,11 @@
 # TODO: Change langchain param names to match the new langchain version
 
 import logging
+import inspect 
 from typing import List, Optional, Union
 
 from langchain.embeddings import CacheBackedEmbeddings
 from langchain_community.embeddings.ollama import OllamaEmbeddings
-from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_core.embeddings import Embeddings
 
 from app.api.deps import get_redis_store
@@ -15,6 +15,8 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+ollama_signature = inspect.signature(OllamaEmbeddings)
+logger.info(f"Inspecting OllamaEmbeddings signature: {ollama_signature}")
 
 class CacheBackedEmbeddingsExtended(CacheBackedEmbeddings):
     def embed_query(self, text: str) -> List[float]:
@@ -43,49 +45,8 @@ class CacheBackedEmbeddingsExtended(CacheBackedEmbeddings):
 
 
 def get_embedding_model(emb_model: Optional[str]) -> CacheBackedEmbeddingsExtended:
-    """
-    Get the embedding model from the embedding model type.
-    """
-    if settings.OLLAMA_ENABLED:
+     if settings.OLLAMA_ENABLED:
         return get_ollama_embedding_model(emb_model)
-    else:
-        return get_hosted_embedding_model(emb_model)
-
-
-def get_hosted_embedding_model(emb_model: Optional[str]) -> CacheBackedEmbeddings:
-    """
-    Get the embedding model from the embedding model type.
-
-    If "OPENAI_API_BASE" is set, it will load Azure GPT models, otherwise it will load
-    OpenAI GPT models.
-    """
-    # TODO: Support embedding models from Ollama
-    if emb_model is None:
-        emb_model = "text-embedding-ada-002"
-
-    underlying_embeddings = None
-    match emb_model:
-        case "text-embedding-ada-002":
-            if settings.OPENAI_API_BASE is not None:
-                underlying_embeddings = OpenAIEmbeddings(
-                    deployment="text-embedding-ada-002-2",
-                    model="text-embedding-ada-002",
-                    openai_api_base=settings.OPENAI_API_BASE,
-                    openai_api_type="azure",
-                    openai_api_key=settings.OPENAI_API_KEY,
-                    chunk_size=1,  # Maximum number of texts to embed in each batch
-                )
-            else:
-                underlying_embeddings = OpenAIEmbeddings()
-        case _:
-            logger.warning(f"embedding model {emb_model} not found, using default emb_model")
-            underlying_embeddings = OpenAIEmbeddings()
-
-    store = get_redis_store()
-    embedder = CacheBackedEmbeddingsExtended.from_bytes_store(
-        underlying_embeddings, store, namespace=underlying_embeddings.model
-    )
-    return embedder
 
 
 def get_ollama_embedding_model(emb_model: Optional[str]) -> CacheBackedEmbeddingsExtended:
@@ -95,7 +56,21 @@ def get_ollama_embedding_model(emb_model: Optional[str]) -> CacheBackedEmbedding
     if emb_model is None:
         emb_model = settings.OLLAMA_DEFAULT_MODEL
 
-    underlying_embeddings = OllamaEmbeddings(base_url=settings.OLLAMA_URL, model=emb_model, show_progress=True)
+    logger.info(f"Getting Ollama embedding model: {emb_model}")
+
+    valid_options = {"base_url", "model", "show_progress"}
+    
+    ollama_kwargs = {
+        "base_url": settings.OLLAMA_URL,
+        "model": emb_model,
+        "show_progress": True
+    }
+    
+    filtered_options = {k: v for k, v in ollama_kwargs.items() if k in valid_options}
+    
+    logger.info(f"Using OllamaEmbeddings with options: {filtered_options}")
+
+    underlying_embeddings = OllamaEmbeddings(**filtered_options)
     store = get_redis_store()
     embedder = CacheBackedEmbeddingsExtended.from_bytes_store(
         underlying_embeddings, store, namespace=underlying_embeddings.model

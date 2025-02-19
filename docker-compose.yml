@@ -99,6 +99,19 @@ services:
     depends_on:
       - prometheus
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - 11434:11434
+    expose:
+      - 11434
+    volumes:
+      - ollama_data:/root/.ollama
+    labels:
+      - "prometheus-job=ollama"
+
   caddy_reverse_proxy:
     container_name: caddy_reverse_proxy
     image: caddy:alpine
@@ -120,3 +133,4 @@ volumes:
   caddy_data:
   caddy_config:
   grafana_data:
+  ollama_data:
